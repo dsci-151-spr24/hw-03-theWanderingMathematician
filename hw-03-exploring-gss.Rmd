@@ -5,7 +5,7 @@ date: "March 26"
 output: html_document
 ---
 
-```{r include = FALSE}
+```{r setup, include = FALSE}
 knitr::opts_chunk$set(
   eval = FALSE,
   out.width = "80%",
@@ -75,8 +75,25 @@ Answers to this question are stored in the `harass5` variable in our dataset.
 
 1.  What are the possible responses to this question and how many respondents chose each of these answers?
 
+```{r harassment-count}
+gss16 %>%
+  count(harass5)
+```
+
+- *There are three possible answers: 'Yes', 'No', and 'Does not apply (i do not have a job/superior/co-worker)'. `r count(filter(gss16, harass5 == "Yes"))#n` people responded 'yes', `r count(filter(gss16, harass5 == "No"))#n` people responded 'no', `r count(filter(gss16, harass5 == "Does not apply (i do not have a job/superior/co-worker)"))#n` people responded 'does not apply', and `r count(filter(gss16, is.na(harass5)))#n` people either did not respond or have missing data for some other reason.*
+
 2.  What percent of the respondents for whom this question is applicable\
     (i.e. excluding `NA`s and `Does not apply`s) have been harassed by their superiors or co-workers at their job.
+
+```{r}
+gss16 %>%
+  filter(harass5 == "Yes" | harass5 == "No") %>%
+  count(harass5, total = n()) %>%
+  mutate(percent = n/total*100, .keep = "unused")
+  
+```
+
+- *Of the applicable people who responded to this question, 17% had been harassed at their job.*
 
 🧶 ✅ ⬆️ Knit, *commit, and push your changes to GitHub with an appropriate commit message. Make sure to commit and push all changed files so that your Git pane is cleared up afterwards.*
 

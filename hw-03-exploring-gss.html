@@ -421,13 +421,32 @@ any bullying, physical or psychological abuse?</em></p>
 <p>Answers to this question are stored in the <code>harass5</code>
 variable in our dataset.</p>
 <ol style="list-style-type: decimal">
-<li><p>What are the possible responses to this question and how many
-respondents chose each of these answers?</p></li>
-<li><p>What percent of the respondents for whom this question is
+<li>What are the possible responses to this question and how many
+respondents chose each of these answers?</li>
+</ol>
+<pre class="r"><code>gss16 %&gt;%
+  count(harass5)</code></pre>
+<ul>
+<li><em>There are three possible answers: ‘Yes’, ‘No’, and ‘Does not
+apply (i do not have a job/superior/co-worker)’. 237 people responded
+‘yes’, 1136 people responded ‘no’, 96 people responded ‘does not apply’,
+and 1398 people either did not respond or have missing data for some
+other reason.</em></li>
+</ul>
+<ol start="2" style="list-style-type: decimal">
+<li>What percent of the respondents for whom this question is
 applicable<br />
 (i.e. excluding <code>NA</code>s and <code>Does not apply</code>s) have
-been harassed by their superiors or co-workers at their job.</p></li>
+been harassed by their superiors or co-workers at their job.</li>
 </ol>
+<pre class="r"><code>gss16 %&gt;%
+  filter(harass5 == &quot;Yes&quot; | harass5 == &quot;No&quot;) %&gt;%
+  count(harass5, total = n()) %&gt;%
+  mutate(percent = n/total*100, .keep = &quot;unused&quot;)</code></pre>
+<ul>
+<li><em>Of the applicable people who responded to this question, 17% had
+been harassed at their job.</em></li>
+</ul>
 <p>🧶 ✅ ⬆️ Knit, <em>commit, and push your changes to GitHub with an
 appropriate commit message. Make sure to commit and push all changed
 files so that your Git pane is cleared up afterwards.</em></p>
