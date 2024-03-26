@@ -1,5 +1,7 @@
 ---
 title: "HW 03 - Exploring the GSS"
+author: "Micaiah Balonek"
+date: "March 26"
 output: html_document
 ---
 
