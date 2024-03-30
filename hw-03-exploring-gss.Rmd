@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(
-  eval = FALSE,
+  eval = TRUE,
   out.width = "80%",
   fig.asp = 0.618,
   fig.width = 10,
@@ -53,6 +53,8 @@ You can load them by running the following in your Console:
 ```{r load-packages, message = FALSE, eval = TRUE}
 library(tidyverse)
 library(dsbox)
+library(tidymodels)
+library(flextable)
 ```
 
 ## Data
@@ -89,7 +91,8 @@ gss16 %>%
 gss16 %>%
   filter(harass5 == "Yes" | harass5 == "No") %>%
   count(harass5, total = n()) %>%
-  mutate(percent = n/total*100, .keep = "unused")
+  mutate(percent = n/total*100, .keep = "unused") %>%
+  flextable() %>% autofit()
   
 ```
 
@@ -105,25 +108,111 @@ For example, if the response is 2.5 hrs, this would be recorded as `emailhr = 2`
 
 3.  Create a new variable called `email` that combines these two variables to reports the number of minutes the respondents spend on email weekly.
 
+```{r email-time}
+gss16 <- gss16 %>%
+  mutate(email = emailmin + emailhr*60)
+```
+
 4.  Visualize the distribution of this new variable.
     Find the mean and the median number of minutes respondents spend on email weekly.
     Is the mean or the median a better measure of the typical among of time Americans spend on email weekly?
     Why?
 
+```{r email-distribution}
+gss16 %>%
+  ggplot(aes(x = email)) +
+  geom_histogram(binwidth = 60)
+gss16 %>%
+  filter(!is.na(email)) %>%
+  summarise(mean(email), median(email)) %>%
+  flextable() %>% autofit()
+```
+
+- *The distribution consistently increases in peak height closer to 0, with a few notable outliers, which skew the mean to be a disproportionately large value. Therefore, the median is the more accurate summary statistic.*
+
 5.  Create another new variable, `snap_insta` that is coded as "Yes" if the respondent reported using any of Snapchat (`snapchat`) or Instagram (`instagrm`), and "No" if not.
     If the recorded value was `NA` for both of these questions, the value in your new variable should also be `NA`.
 
+```{r snap-insta-var}
+gss16 <- gss16 %>% 
+  mutate(snap_insta = case_when(
+    is.na(snapchat) & is.na(instagrm) ~ NA,
+    snapchat == "Yes" | instagrm == "Yes" ~ "Yes",
+    TRUE ~ "No"
+  ))
+```
+
 6.  Calculate the percentage of Yes's for `snap_insta` among those who answered the question, i.e. excluding `NA`s.
+
+```{r snap-insta-percent}
+gss16 %>%
+  filter(!is.na(snap_insta)) %>%
+  count(snap_insta) %>%
+  mutate(snap_insta_percent = 100*n/sum(n), .keep = "unused") %>%
+  flextable() %>% autofit()
+```
+
+- *About 63% of people who responded answered that they didn't use  instagram or snapchat, and about 37% answered that they used at least one of them.*
 
 7.  What are the possible responses to the question *Last week were you working full time, part time, going to school, keeping house, or what?* and how many respondents chose each of these answers?
     Note that this information is stored in the `wrkstat` variable.
 
+```{r wrkstat-analysis}
+gss16 %>% 
+  filter(!is.na(wrkstat)) %>%
+  count(wrkstat) %>%
+  flextable() %>% autofit()
+```
+
+- *In response to this question, 284 people responded that they were keeping house, 574 that they were retired, 76 that they were going to school, 57 that they were temporarily not working, 118 that they were unemployed because they had been laid off, 345 that they were working part-time, 1,321 that they were working full-time, and 89 said that none of the other options applied to them.*
+
 8.  Fit a model predicting `email` (number of minutes per week spent on email) from `educ` (number of years of education), `wrkstat`, and `snap_insta`.
     Interpret the slopes for each of these variables.
+
+```{r email-predict-model}
+email_model <- linear_reg() %>%
+  set_engine("lm") %>%
+  fit(email~educ + wrkstat + snap_insta, data = gss16) %>% tidy()
+
+email_model %>%
+  flextable() %>% autofit()
+```
+- *What this model suggests is that, all else held constant, for every additional year of education someone has, they will spend half an hour more on emails per week than they would otherwise. In addition, each job-type has its own general amount of weekly email-time past the base-level amount. This is 68 minutes for retired people, -124 minutes (i.e. that many minutes less) for people in school, -74 minutes for people who are temporarily not working, 118 more minutes for people who have been laid off, 367 minutes for people working fulltime (although only 19 minutes for people working parttime), and 33 minutes otherwise. In addition people who use snapchat or instagram use email for, on average, 150 more minutes per week than equivalent people who don't.*
+
 
 9.  Create a predicted values vs. residuals plot for this model.
     Are there any issues with the model?
     If yes, describe them.
+
+```{r email-residual-plot, warning=FALSE}
+
+gss16_email_resid <- gss16 %>%
+  mutate(predicted_email = filter(email_model, term == "(Intercept)")$estimate + educ*filter(email_model, term == "educ")$estimate + as.numeric(snap_insta == "Yes")*filter(email_model, term == "snap_instaYes")$estimate + case_when(
+    wrkstat == "Retired" ~ 68.27922,
+    wrkstat == "School" ~ -123.81216,
+    wrkstat == "Temp not working" ~ -73.70850,
+    wrkstat == "Unempl, laid off" ~ 118.34913,
+    wrkstat == "Working fulltime" ~ 366.84029,
+    wrkstat == "Working parttime" ~ 18.90036,
+    wrkstat == "Other" ~ 33.05657
+  ), email_residual = email - predicted_email) 
+
+gss16_email_resid %>%
+  filter(!is.na(email_residual)) %>%
+  ggplot(aes(x = educ, shape = snap_insta, linetype = snap_insta)) +
+  geom_point(aes(y = predicted_email), size = 2, colour = "orange") +
+  geom_smooth(aes(y = predicted_email), colour = "orange") +
+  geom_point(aes(y = abs(email_residual)), size = 2, colour = "blue", ) +
+  facet_wrap(~ wrkstat)
+
+gss16_email_resid %>%
+  filter(email_residual >= predicted_email) %>% 
+  select(email, predicted_email, email_residual, educ, snap_insta, wrkstat) %>%
+  slice_head(n = 20) %>%
+  flextable() %>% autofit()
+```
+
+- *This model consistently has residuals at or above the value the model predicts; just examining the statistics of the points with residuals above the modeled function doesn't show any clear patterns in which ones are predicted with the most problems. While most are in the `wrkstat` category 'Working fulltime', but that is also true of the rest of the data as well. More analysis would be necessary to find a better model for this data.*
 
 🧶 ✅ ⬆️ Knit, *commit, and push your changes to GitHub with an appropriate commit message. Make sure to commit and push all changed files so that your Git pane is cleared up afterwards.*
 
